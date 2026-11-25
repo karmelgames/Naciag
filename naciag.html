@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Miernik naciągu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Barlow:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: rzeczowy, sportowy, bez ozdobników – narzędzie przy korcie
+   IDEA: tablica wyników na korcie twardym – niebieska nawierzchnia, białe linie, żółta piłka
+   PICTURE: główka rakiety z rysunkiem strun, która „drga” po stuknięciu, obok wielki wynik
+   COLOUR and TYPE: niebieski kortu #1d4f91, biały, żółć piłki #d9ec3c; Barlow Condensed na liczby, Barlow na tekst
+   LAYOUT: u góry miernik (rakieta + wynik + przyciski), niżej ustawienia rakiety, kalibracja, historia */
+:root{color-scheme:light dark;--bg:light-dark(#f4f6f9,#0c1626);--ink:light-dark(#0f1c2e,#eef2f7);--court:light-dark(#1d4f91,#173f75);--court2:light-dark(#163d70,#10305b);--ball:#d9ec3c;--mut:light-dark(#5a6878,#9fb0c4);--card:light-dark(#fff,#13223a);--line:light-dark(#dde3ea,#24365a)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Barlow,system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(20px,4vw,48px) max(5vw,16px)}
+.wrap{max-width:1040px;margin:0 auto}
+.hero{background:var(--court);color:#fff;border-bottom:6px solid #fff}
+h1{font:800 clamp(30px,5vw,44px)/1.05 "Barlow Condensed",sans-serif;margin:0 0 4px;text-wrap:balance}
+.sub{color:#c9d8ee;margin:0 0 18px}
+.meter{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:24px;align-items:center}
+.rq{width:100%;max-width:330px;margin:0 auto;display:block}
+.rq .str{stroke:#fff;stroke-width:1.3;opacity:.85;transition:opacity .2s}
+.rq.hit .str{animation:buzz .35s ease-out}
+@keyframes buzz{0%{opacity:1;stroke:var(--ball)}100%{opacity:.85}}
+@media(prefers-reduced-motion:reduce){.rq.hit .str{animation:none}}
+.big{font:800 clamp(64px,13vw,112px)/.9 "Barlow Condensed",sans-serif;white-space:nowrap}
+.big small{font-size:.38em;font-weight:600;margin-left:6px}
+.hz{font:600 22px "Barlow Condensed",sans-serif;color:var(--ball);white-space:nowrap}
+.acc{color:#c9d8ee;margin:4px 0 14px;min-height:1.5em}
+.taps{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;margin-bottom:14px}
+.taps span{background:var(--court2);border:1px solid #3d6aa8;border-radius:14px;padding:2px 10px;font-size:14px;white-space:nowrap}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+button,.fbtn{font:600 16px Barlow,sans-serif;min-height:44px;padding:10px 18px;border-radius:10px;border:0;cursor:pointer}
+.pri{background:var(--ball);color:#0f1c2e}
+.sec{background:transparent;color:#fff;border:2px solid #fff}
+.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button:focus-visible,input:focus-visible,select:focus-visible,.fbtn:focus-within{outline:3px solid var(--ball);outline-offset:2px}
+.status{margin-top:12px;font-size:15px;color:#e8eef7;min-height:1.5em}
+.status.warn{color:#ffd27a}
+input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
+h2{font:800 26px/1.1 "Barlow Condensed",sans-serif;margin:0 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+label{display:block;font-size:14px;color:var(--mut);margin:10px 0 4px}
+input,select{width:100%;font:16px Barlow,sans-serif;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);min-height:44px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.note{font-size:14px;color:var(--mut);margin:10px 0 0}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}
+td.n,th.n{text-align:right;white-space:nowrap}
+.empty{color:var(--mut);padding:10px 0}
+details{margin-top:8px}summary{cursor:pointer;font-weight:600;min-height:32px}
+ol{padding-left:20px;margin:8px 0}
+.x{background:none;border:0;color:var(--mut);min-height:36px;padding:4px 8px;font-size:18px}
+@media(max-width:640px){.meter{grid-template-columns:1fr}.rq{max-width:220px}.out{text-align:center}.btns,.taps{justify-content:center}}
+</style>
+</head>
+<body>
+<section class="band hero"><div class="wrap">
+<h1>Miernik naciągu strun</h1>
+<p class="sub" id="who">Stuknij w struny i słuchaj, co mówią.</p>
+<div class="meter">
+<svg class="rq" id="rq" viewBox="0 0 220 300" aria-hidden="true">
+<defs><clipPath id="hc"><ellipse cx="110" cy="112" rx="78" ry="100"/></clipPath>
+<radialGradient id="gl" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#2f6cc0"/><stop offset="1" stop-color="#143866"/></radialGradient></defs>
+<ellipse cx="114" cy="118" rx="92" ry="114" fill="#0a2547" opacity=".45"/>
+<ellipse cx="110" cy="112" rx="78" ry="100" fill="url(#gl)"/>
+<g clip-path="url(#hc)" id="strs"></g>
+<ellipse cx="110" cy="112" rx="84" ry="106" fill="none" stroke="#0f1c2e" stroke-width="12"/>
+<ellipse cx="110" cy="112" rx="84" ry="106" fill="none" stroke="#d9ec3c" stroke-width="3"/>
+<path d="M80 212 L100 262 L120 262 L140 212" fill="none" stroke="#0f1c2e" stroke-width="12" stroke-linejoin="round"/>
+<rect x="98" y="258" width="24" height="40" rx="5" fill="#0f1c2e"/>
+<circle id="ball" cx="176" cy="34" r="0" fill="#d9ec3c"/>
+</svg>
+<div class="out">
+<div class="big" id="kg">–<small id="unit">kg</small></div>
+<div class="hz" id="hz">czekam na stuknięcie</div>
+<div class="acc" id="acc"></div>
+<div class="taps" id="taps"></div>
+<div class="btns">
+<button class="pri" id="live">Słuchaj (mikrofon)</button>
+<label class="fbtn sec" style="margin:0;color:#fff">Nagraj stuknięcia<input type="file" id="file" accept="audio/*" capture></label>
+<button class="sec" id="save">Zapisz pomiar</button>
+<button class="sec" id="clr">Wyczyść</button>
+</div>
+<div class="status" id="st"></div>
+</div>
+</div>
+</div></section>
+
+<section class="band"><div class="wrap grid">
+<div class="card">
+<h2>Rakieta i naciąg</h2>
+<label for="sel">Rakieta</label>
+<div class="row"><select id="sel"></select><button class="ghost" id="add">+ Nowa rakieta</button></div>
+<label for="name">Nazwa</label><input id="name">
+<div class="row">
+<div><label for="head">Główka (cal²)</label><input id="head" type="number" step="1" inputmode="numeric"></div>
+<div><label for="gauge">Grubość struny (mm)</label><input id="gauge" type="number" step="0.01" inputmode="decimal"></div>
+</div>
+<label for="type">Rodzaj struny</label>
+<select id="type"></select>
+<label for="sname">Struna (dla porządku)</label><input id="sname">
+<div class="row">
+<div><label for="mach">Naciąg na maszynie</label><input id="mach" placeholder="np. 23/22 kg"></div>
+<div><label for="date">Data naciągnięcia</label><input id="date" type="date"></div>
+</div>
+<div class="row" style="margin-top:14px">
+<div><label for="units">Jednostki</label><select id="units"><option value="kg">kg</option><option value="lb">lb</option></select></div>
+<div style="align-self:end"><button class="ghost" id="del" style="width:100%">Usuń rakietę</button></div>
+</div>
+</div>
+
+<div class="card">
+<h2>Kalibracja</h2>
+<p style="margin:0">Bez kalibracji wynik jest <b>przybliżony</b> (zwykle ±2–3 kg). Za to <b>spadek</b> naciągu z tygodnia na tydzień pokazuje dokładnie.</p>
+<p class="note">Najlepiej: zaraz po naciągnięciu zmierz rakietę i wpisz rzeczywisty naciąg, jeśli znasz go z dobrego miernika (np. ERT). Od tej chwili apka liczy pod Twoją rakietę.</p>
+<label for="real">Rzeczywisty naciąg teraz (kg)</label>
+<div class="row"><input id="real" type="number" step="0.1" inputmode="decimal"><button class="ghost" id="cal">Skalibruj</button></div>
+<p class="note" id="calinfo"></p>
+<button class="ghost" id="uncal" style="margin-top:8px">Usuń kalibrację</button>
+<details><summary>Jak stukać, żeby wynik był dobry</summary>
+<ol>
+<li>Cicho w pomieszczeniu, telefon 2–10 cm od strun, mikrofonem (mała dziurka na dole) do strun.</li>
+<li>Stukaj w środek naciągu twardym, okrągłym przedmiotem: długopisem, krawędzią drugiej rakiety, paznokciem. Nie piłką.</li>
+<li>Trzymaj rakietę za rączkę, ramy nie dotykaj.</li>
+<li>Zrób 5–6 stuknięć co sekundę. Liczy się średnia; im mniejszy rozrzut, tym pewniejszy wynik.</li>
+</ol>
+<p class="note">„Słuchaj (mikrofon)” działa, gdy strona może użyć mikrofonu. Jeśli nie może, użyj „Nagraj stuknięcia”: telefon otworzy dyktafon, nagrasz kilka stuknięć i apka je przeanalizuje.</p>
+</details>
+</div>
+
+<div class="card" style="grid-column:1/-1">
+<h2>Historia pomiarów</h2>
+<div id="hist"></div>
+</div>
+</div></section>
+
+<script>
+{
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const TYPES=[['multi','Multifilament (np. Velocity MLT, NXT)',1100],['syn','Syntetyk nylonowy',1140],['poly','Poliester / co-poly (np. RPM, Alu Power)',1360],['gut','Jelito naturalne',1280],['kev','Kevlar / aramid',1440]];
+const K=7.0; // stała dobrana do typowych wyników rakiet tenisowych; kalibracja ją poprawia
+const fmt=(v,d=1)=>v.toLocaleString('pl-PL',{minimumFractionDigits:d,maximumFractionDigits:d});
+const today=()=>new Date().toISOString().slice(0,10);
+const uid=()=>Math.random().toString(36).slice(2,9);
+
+let db={cur:null,units:'kg',rq:[]};
+try{const s=JSON.parse(localStorage.getItem('naciag-v1'));if(s&&s.rq&&s.rq.length)db=s}catch(e){}
+if(!db.rq.length){const r={id:uid(),name:'Yonex EZONE 100',head:100,gauge:1.30,type:'multi',sname:'Head Velocity MLT 1.30',mach:'23/22 kg',date:'',cal:1,hist:[]};db.rq.push(r);db.cur=r.id}
+const save=()=>{try{localStorage.setItem('naciag-v1',JSON.stringify(db))}catch(e){}};
+const cur=()=>db.rq.find(r=>r.id===db.cur)||db.rq[0];
+
+$('type').innerHTML=TYPES.map(t=>`<option value="${t[0]}">${esc(t[1])}</option>`).join('');
+
+// rysunek strun
+{let g='';for(let i=0;i<16;i++){const x=32+i*(156/15);g+=`<line class="str" x1="${x}" y1="0" x2="${x}" y2="220"/>`}
+for(let j=0;j<19;j++){const y=14+j*(196/18);g+=`<line class="str" x1="20" y1="${y}" x2="200" y2="${y}"/>`}$('strs').innerHTML=g}
+
+function mu(r){const d=(+r.gauge||1.3)/1000;const rho=(TYPES.find(t=>t[0]===r.type)||TYPES[0])[2];return Math.PI*(d/2)**2*rho}
+function kgRaw(r,f){const A=(+r.head||100)*6.4516e-4;return K*mu(r)*A*f*f/9.80665}
+const kgOf=(r,f)=>kgRaw(r,f)*(r.cal||1);
+const show=kg=>db.units==='lb'?kg*2.20462:kg;
+
+let taps=[];
+function render(){
+const r=cur();
+$('sel').innerHTML=db.rq.map(x=>`<option value="${x.id}"${x.id===r.id?' selected':''}>${esc(x.name||'Rakieta')}</option>`).join('');
+for(const k of ['name','head','gauge','type','sname','mach','date'])if(document.activeElement!==$(k))$(k).value=r[k]??'';
+$('units').value=db.units;$('unit').textContent=db.units;
+$('who').textContent=`${r.name||'Rakieta'} · ${r.sname||'struna'}${r.mach?' · '+r.mach:''}`;
+$('calinfo').textContent=(r.cal&&r.cal!==1)?`Skalibrowano: współczynnik ${fmt(r.cal,3)}.`:'Brak kalibracji – wynik przybliżony.';
+renderTaps();renderHist();
+}
+function renderTaps(){
+const r=cur();
+if(!taps.length){$('kg').firstChild.nodeValue='–';$('hz').textContent='czekam na stuknięcie';$('acc').textContent='';$('taps').innerHTML='';return}
+const fs=taps.slice(-6),f=fs.reduce((a,b)=>a+b,0)/fs.length;
+const kg=kgOf(r,f);
+$('kg').firstChild.nodeValue=fmt(show(kg));
+$('hz').textContent=`${fmt(f,0)} Hz`;
+if(fs.length>1){const sd=Math.sqrt(fs.reduce((a,b)=>a+(b-f)**2,0)/(fs.length-1));const dk=show(kg*2*sd/f);
+$('acc').textContent=`Rozrzut ±${fmt(dk)} ${db.units} z ${fs.length} stuknięć · ${dk<0.4?'pewny wynik':dk<1?'w miarę pewny':'stukaj równiej'}`}
+else $('acc').textContent='Stuknij jeszcze kilka razy';
+$('taps').innerHTML=fs.map(x=>`<span>${fmt(show(kgOf(r,x)))} · ${fmt(x,0)} Hz</span>`).join('');
+}
+function renderHist(){
+const r=cur(),h=r.hist||[];
+if(!h.length){$('hist').innerHTML='<p class="empty">Jeszcze nic. Zmierz i kliknij „Zapisz pomiar”, a tu zobaczysz, jak naciąg spada z czasem.</p>';return}
+const first=h[0];
+$('hist').innerHTML=`<table><thead><tr><th>Data</th><th class="n">Naciąg</th><th class="n">Hz</th><th class="n">Od 1. pomiaru</th><th></th></tr></thead><tbody>${
+h.map((m,i)=>{const kg=kgOf(r,m.hz),d=kg-kgOf(r,first.hz);return `<tr><td>${esc(m.d)}</td><td class="n">${fmt(show(kg))} ${db.units}</td><td class="n">${fmt(m.hz,0)}</td><td class="n">${i?(d>0?'+':'')+fmt(show(d))+' '+db.units:'–'}</td><td class="n"><button class="x" data-i="${i}" aria-label="Usuń">×</button></td></tr>`}).join('')}</tbody></table>
+<p class="note">Wyniki w historii przeliczają się po kalibracji, bo apka zapisuje częstotliwość (Hz).</p>`;
+}
+
+// ---------- analiza dźwięku ----------
+function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}
+for(let len=2;len<=n;len<<=1){const a=-2*Math.PI/len,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const p=i+k,q=p+len/2,tr=re[q]*cr-im[q]*ci,ti=re[q]*ci+im[q]*cr;re[q]=re[p]-tr;im[q]=im[p]-ti;re[p]+=tr;im[p]+=ti;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
+// zwraca częstotliwość drgań naciągu dla fragmentu zaraz po stuknięciu
+function peak(seg,sr){
+const N=32768,re=new Float64Array(N),im=new Float64Array(N),L=Math.min(seg.length,N);
+for(let i=0;i<L;i++)re[i]=seg[i]*(0.5-0.5*Math.cos(2*Math.PI*i/(L-1)));
+fft(re,im);
+const lo=Math.floor(330*N/sr),hi=Math.ceil(820*N/sr),m=[];
+for(let k=lo-2;k<=hi+2;k++)m[k]=Math.hypot(re[k],im[k]);
+let b=lo;for(let k=lo;k<=hi;k++)if(m[k]>m[b])b=k;
+const band=m.slice(lo,hi+1).sort((x,y)=>x-y),med=band[band.length>>1]||1e-12;
+if(m[b]/med<6||b===lo||b===hi)return null;
+const y0=Math.log(m[b-1]+1e-12),y1=Math.log(m[b]),y2=Math.log(m[b+1]+1e-12),off=0.5*(y0-y2)/(y0-2*y1+y2);
+return (b+(isFinite(off)?off:0))*sr/N;
+}
+const SKIP=0.012,WIN=0.16;
+function cut(buf,start,sr){return buf.subarray(start+Math.round(SKIP*sr),start+Math.round((SKIP+WIN)*sr))}
+
+function addTap(f){if(!f)return false;taps.push(f);if(taps.length>12)taps.shift();
+const rq=$('rq');rq.classList.remove('hit');void rq.getBBox();rq.classList.add('hit');renderTaps();return true}
+function status(t,w){$('st').textContent=t;$('st').className='status'+(w?' warn':'')}
+
+// nagranie z pliku (dyktafon)
+$('file').addEventListener('change',async e=>{
+const f=e.target.files[0];e.target.value='';if(!f)return;
+status('Analizuję nagranie…');
+try{const ac=new (window.AudioContext||window.webkitAudioContext)();
+const ab=await ac.decodeAudioData(await f.arrayBuffer());ac.close&&ac.close();
+const x=ab.getChannelData(0),sr=ab.sampleRate,fr=Math.round(0.005*sr),rms=[];
+for(let i=0;i+fr<=x.length;i+=fr){let s=0;for(let j=i;j<i+fr;j++)s+=x[j]*x[j];rms.push(Math.sqrt(s/fr))}
+const srt=[...rms].sort((a,b)=>a-b),floor=srt[Math.floor(srt.length*.2)]||0,top=srt[srt.length-1]||0,th=Math.max(floor*6,top*.12);
+let n=0,last=-1e9;
+for(let i=1;i<rms.length;i++){if(rms[i]>th&&rms[i-1]<=th&&i-last>50){last=i;const s=i*fr;if(s+(SKIP+WIN)*sr<x.length&&addTap(peak(cut(x,s,sr),sr)))n++}}
+status(n?`Znalazłem ${n} stuknięć w nagraniu.`:'Nie znalazłem wyraźnych stuknięć. Stukaj bliżej mikrofonu i w ciszy.',!n);
+}catch(err){status('Nie udało się odczytać nagrania. Spróbuj nagrać w innym formacie (np. m4a).',true)}
+});
+
+// na żywo z mikrofonu
+let live=null;
+$('live').addEventListener('click',async()=>{
+if(live){live.stop();return}
+try{const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+const ac=new (window.AudioContext||window.webkitAudioContext)(),sr=ac.sampleRate,src=ac.createMediaStreamSource(stream),pr=ac.createScriptProcessor(2048,1,1);
+const R=sr,ring=new Float32Array(R);let pos=0,total=0,floor=0.002,pend=-1,lastOn=-1e9;
+pr.onaudioprocess=ev=>{const d=ev.inputBuffer.getChannelData(0);
+for(let i=0;i<d.length;i+=256){let s=0;const e=Math.min(i+256,d.length);for(let j=i;j<e;j++)s+=d[j]*d[j];const r=Math.sqrt(s/(e-i)),at=total+i;
+if(pend<0&&r>Math.max(floor*8,0.02)&&at-lastOn>0.3*sr){pend=at;lastOn=at}else if(pend<0)floor=floor*.97+r*.03}
+for(let j=0;j<d.length;j++){ring[pos]=d[j];pos=(pos+1)%R}total+=d.length;
+if(pend>=0&&total-pend>=(SKIP+WIN)*sr){const need=Math.round((SKIP+WIN)*sr),seg=new Float32Array(need),st=(pos-(total-pend)+R*2)%R;
+for(let j=0;j<need;j++)seg[j]=ring[(st+j)%R];pend=-1;
+if(!addTap(peak(cut(seg,0,sr),sr)))status('Stuknięcie niewyraźne – spróbuj jeszcze raz.',true);else status('Słucham… stukaj co sekundę.')}};
+src.connect(pr);pr.connect(ac.destination);
+live={stop(){pr.disconnect();src.disconnect();stream.getTracks().forEach(t=>t.stop());ac.close();live=null;$('live').textContent='Słuchaj (mikrofon)';status('Zatrzymano.')}};
+$('live').textContent='Zatrzymaj';status('Słucham… stukaj co sekundę.');
+}catch(err){status('Ta strona nie dostała dostępu do mikrofonu. Użyj przycisku „Nagraj stuknięcia”.',true)}
+});
+
+$('save').addEventListener('click',()=>{if(!taps.length){status('Najpierw zmierz.',true);return}
+const fs=taps.slice(-6),f=fs.reduce((a,b)=>a+b,0)/fs.length,r=cur();(r.hist=r.hist||[]).push({d:today(),hz:Math.round(f*10)/10});save();renderHist();status('Zapisano pomiar.')});
+$('clr').addEventListener('click',()=>{taps=[];renderTaps();status('')});
+$('hist').addEventListener('click',e=>{const b=e.target.closest('.x');if(!b)return;cur().hist.splice(+b.dataset.i,1);save();renderHist()});
+for(const k of ['name','head','gauge','type','sname','mach','date'])$(k).addEventListener('input',()=>{const r=cur();r[k]=['head','gauge'].includes(k)?parseFloat(String($(k).value).replace(',','.'))||'':$(k).value;save();render()});
+$('units').addEventListener('change',()=>{db.units=$('units').value;save();render()});
+$('sel').addEventListener('change',()=>{db.cur=$('sel').value;taps=[];save();render()});
+$('add').addEventListener('click',()=>{const r={id:uid(),name:'Nowa rakieta',head:100,gauge:1.25,type:'poly',sname:'',mach:'',date:today(),cal:1,hist:[]};db.rq.push(r);db.cur=r.id;taps=[];save();render();$('name').focus()});
+let delArm=0;$('del').addEventListener('click',()=>{if(db.rq.length<2){status('To jedyna rakieta – zmień jej dane zamiast usuwać.',true);return}
+if(Date.now()-delArm>3000){delArm=Date.now();$('del').textContent='Kliknij znowu, by usunąć';setTimeout(()=>$('del').textContent='Usuń rakietę',3000);return}
+db.rq=db.rq.filter(r=>r.id!==db.cur);db.cur=db.rq[0].id;taps=[];save();render();$('del').textContent='Usuń rakietę'});
+$('cal').addEventListener('click',()=>{const v=parseFloat(String($('real').value).replace(',','.')),r=cur();
+if(!taps.length||!v){status('Najpierw zmierz rakietę, potem wpisz rzeczywisty naciąg.',true);return}
+const fs=taps.slice(-6),f=fs.reduce((a,b)=>a+b,0)/fs.length;r.cal=v/kgRaw(r,f);save();render();status('Skalibrowano.')});
+$('uncal').addEventListener('click',()=>{cur().cal=1;save();render()});
+render();
+}
+</script>
+</body>
+</html>
